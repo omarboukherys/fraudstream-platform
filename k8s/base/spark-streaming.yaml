@@ -1,0 +1,39 @@
+# Mode "local[*]" dans un pod : suffisant pour la démo et pour kind.
+# Sur GKE en prod : spark-submit --master k8s://... --deploy-mode cluster, ou l'opérateur Spark (Kubeflow),
+# avec un driver et N executors. Le même jar est réutilisé tel quel (voir overlays/gke/spark-submit.sh).
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: spark-streaming, namespace: fraudstream}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}      # un seul driver à la fois sur le même checkpoint
+  selector: {matchLabels: {app: spark-streaming}}
+  template:
+    metadata: {labels: {app: spark-streaming}}
+    spec:
+      containers:
+        - name: spark
+          image: fraudstream/spark-streaming:0.1.0
+          ports: [{containerPort: 4040, name: spark-ui}]
+          envFrom: [{configMapRef: {name: fraudstream-config}}]
+          env:
+            - {name: SPARK_DRIVER_MEMORY, value: 1g}
+          resources: {requests: {cpu: 500m, memory: 1536Mi}, limits: {memory: 2Gi}}
+          volumeMounts: [{name: data, mountPath: /data}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: lake-pvc}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: lake-pvc, namespace: fraudstream}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 5Gi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: spark-ui, namespace: fraudstream}
+spec:
+  selector: {app: spark-streaming}
+  ports: [{port: 4040, targetPort: 4040}]

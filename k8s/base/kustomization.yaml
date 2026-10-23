@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: fraudstream
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - kafka.yaml
+  - cassandra.yaml
+  - producer.yaml
+  - spark-streaming.yaml
+  - agents.yaml
+configMapGenerator:
+  - name: cassandra-schema-file
+    files:
+      - schema.cql=../../cassandra/schema.cql
+generatorOptions:
+  disableNameSuffixHash: true

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fraudstream-config
+  namespace: fraudstream
+data:
+  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+  CASSANDRA_HOST: cassandra
+  CASSANDRA_KEYSPACE: fraudstream
+  LAKE_PATH: /data/lake            # overlay gke : gs://<bucket>/lake
+  CHECKPOINT_PATH: /data/checkpoints
+  GEMINI_MODEL: gemini-2.5-flash
+  USE_BIGQUERY: "false"
+  ALERT_CONSUMER_ENABLED: "true"

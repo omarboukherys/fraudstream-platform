@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: agents, namespace: fraudstream}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: agents}}
+  template:
+    metadata: {labels: {app: agents}}
+    spec:
+      containers:
+        - name: agents
+          image: fraudstream/agents:0.1.0
+          ports: [{containerPort: 8000}]
+          envFrom:
+            - {configMapRef: {name: fraudstream-config}}
+            - {secretRef: {name: fraudstream-secrets}}
+          readinessProbe: {httpGet: {path: /health, port: 8000}, initialDelaySeconds: 15}
+          resources: {requests: {cpu: 200m, memory: 512Mi}, limits: {memory: 1Gi}}
+          volumeMounts: [{name: data, mountPath: /data, readOnly: true}]
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: lake-pvc}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: agents, namespace: fraudstream}
+spec:
+  selector: {app: agents}
+  ports: [{port: 8000, targetPort: 8000}]

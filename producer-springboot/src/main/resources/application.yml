@@ -1,0 +1,44 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: transaction-producer
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9094}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
+      retries: 5
+      compression-type: lz4
+      properties:
+        linger.ms: 20
+        batch.size: 65536
+        enable.idempotence: true
+        spring.json.add.type.headers: false   # JSON brut, lisible par Spark sans en-têtes Spring
+        # --- Azure Event Hubs (API Kafka) : décommenter et renseigner (voir docs/azure-portability.md)
+        # security.protocol: SASL_SSL
+        # sasl.mechanism: PLAIN
+        # sasl.jaas.config: org.apache.kafka.common.security.plain.PlainLoginModule required username="$ConnectionString" password="${EVENTHUBS_CONNECTION_STRING}";
+
+producer:
+  topic: transactions.raw
+  rate-per-second: ${PRODUCER_RATE_PER_SECOND:20}
+  fraud-ratio: ${PRODUCER_FRAUD_RATIO:0.03}
+  customers: ${PRODUCER_CUSTOMERS:500}
+  seed: 42
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    io.fraudstream: INFO
+    org.apache.kafka: WARN

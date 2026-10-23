@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+  - secret.yaml
+  - serviceaccount.yaml
+images:
+  - name: fraudstream/producer
+    newName: REGION-docker.pkg.dev/PROJECT_ID/fraudstream/producer
+  - name: fraudstream/spark-streaming
+    newName: REGION-docker.pkg.dev/PROJECT_ID/fraudstream/spark-streaming
+  - name: fraudstream/agents
+    newName: REGION-docker.pkg.dev/PROJECT_ID/fraudstream/agents
+patches:
+  - patch: |-
+      - op: replace
+        path: /data/LAKE_PATH
+        value: gs://PROJECT_ID-fraudstream-lake/lake
+      - op: replace
+        path: /data/USE_BIGQUERY
+        value: "true"
+    target: {kind: ConfigMap, name: fraudstream-config}
+  # Workload Identity : le pod agents/spark utilise le compte de service GCP (pas de clé JSON dans le cluster)
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/serviceAccountName
+        value: fraudstream-ksa
+    target: {kind: Deployment, name: agents}
+  - patch: |-
+      - op: add
+        path: /spec/template/spec/serviceAccountName
+        value: fraudstream-ksa
+    target: {kind: Deployment, name: spark-streaming}

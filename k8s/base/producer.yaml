@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: producer, namespace: fraudstream}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: producer}}
+  template:
+    metadata:
+      labels: {app: producer}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/path: /actuator/prometheus, prometheus.io/port: "8090"}
+    spec:
+      containers:
+        - name: producer
+          image: fraudstream/producer:0.1.0
+          ports: [{containerPort: 8090}]
+          envFrom: [{configMapRef: {name: fraudstream-config}}]
+          env:
+            - {name: PRODUCER_RATE_PER_SECOND, value: "20"}
+            - {name: PRODUCER_FRAUD_RATIO, value: "0.03"}
+          readinessProbe: {httpGet: {path: /actuator/health, port: 8090}, initialDelaySeconds: 20}
+          resources: {requests: {cpu: 200m, memory: 384Mi}, limits: {memory: 512Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: producer, namespace: fraudstream}
+spec:
+  selector: {app: producer}
+  ports: [{port: 8090, targetPort: 8090}]
