@@ -14,6 +14,25 @@ Spring Boot ──▶ Kafka ──▶ Spark Streaming (Scala) ──▶ Cassandr
                                    └─▶ fraud.alerts ──▶ Agent IA (Gemini + LangGraph) ──▶ rapport d'enquête
 ```
 
+## Genèse : de l'inférence serverless à la plateforme Big Data
+
+Ce projet est la **v2** de deux projets AWS que j'ai construits auparavant sur le même cas d'usage :
+
+- [`aws-sagemaker-mlops-pipeline`](https://github.com/omarboukherys/aws-sagemaker-mlops-pipeline) — entraînement XGBoost sur données déséquilibrées, Model Registry, endpoint temps réel, Model Monitor.
+- [`aws-realtime-ml-inference`](https://github.com/omarboukherys/aws-realtime-ml-inference) — Kinesis → Lambda → endpoint SageMaker → alertes SNS.
+
+La v1 répondait à « comment scorer une transaction en temps réel avec un modèle en production ». La v2 répond à la question suivante, celle d'une équipe data platform : « comment faire tenir ça à l'échelle, avec de l'état, plusieurs consommateurs, de l'analytique et une boucle d'évaluation ».
+
+| | v1 (AWS serverless) | v2 (ce repo) |
+|---|---|---|
+| Ingestion | Kinesis | Kafka (partitionnement par client, plusieurs consommateurs) |
+| Traitement | Lambda sans état, 1 transaction à la fois | Spark Structured Streaming avec état par client (fenêtres, devices, moyenne historique) |
+| Scoring | Modèle XGBoost sur endpoint SageMaker | Règles explicables en Scala, conçues pour être remplacées par le modèle de la v1 (`RiskScorer.process`) |
+| Suite d'une alerte | E-mail SNS | Agent IA qui enquête, rend un verdict et une action, avec trace d'audit |
+| Stockage | Logs CloudWatch | Cassandra (serving) + lac Parquet + BigQuery (analytique) |
+| Évaluation | — | Précision / rappel quotidiens et rappel par scénario de fraude (Airflow) |
+| Déploiement | Lambda | Kubernetes (kind / GKE), portabilité Azure documentée |
+
 ## Ce que montre ce projet
 
 | Compétence | Où la voir |
