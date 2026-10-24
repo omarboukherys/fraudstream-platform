@@ -1,10 +1,15 @@
 """Outils exposés aux agents (LangChain StructuredTool). Chaque outil est une fermeture sur ses dépendances."""
 from __future__ import annotations
 
+import functools
 import json
+import logging
+import time
 from typing import Any
 
 from langchain_core.tools import StructuredTool
+
+log = logging.getLogger(__name__)
 
 from .analytics import SCHEMA_DOC, SqlGuardError, strip_code_fences
 from .config import Settings, settings as default_settings
@@ -24,10 +29,25 @@ def _dump(obj: Any) -> str:
     return json.dumps(obj, ensure_ascii=False, default=str)
 
 
+def _timed(fn):
+    """Journalise la durée et la taille de chaque appel d'outil : indispensable pour localiser une enquête lente."""
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        t0 = time.perf_counter()
+        try:
+            out = fn(*args, **kwargs)
+            return out
+        finally:
+            ms = int((time.perf_counter() - t0) * 1000)
+            size = len(out) if "out" in locals() and isinstance(out, str) else -1
+            log.info("outil %s : %d ms, %d caractères, args=%s", fn.__name__, ms, size, _dump(kwargs or args)[:200])
+    return wrapper
+
+
 def build_tools(store, analytics, kafka_ops=None, cfg: Settings = default_settings) -> list[StructuredTool]:
     def get_customer_history(customer_id: str, limit: int = 20) -> str:
         """Dernières transactions du client (les plus récentes d'abord) avec score et raisons de risque."""
-        return _dump(store.customer_history(customer_id, min(limit, 50)))
+        return _dump(store.customer_history(customer_id, min(limit, cfg.history_limit)))
 
     def get_customer_profile(customer_id: str) -> str:
         """Profil courant du client : agrégats sur 10 min, dernier pays et dernier appareil vus."""
@@ -56,10 +76,10 @@ def build_tools(store, analytics, kafka_ops=None, cfg: Settings = default_settin
     query_analytics.__doc__ += "\n\n" + SCHEMA_DOC
 
     tools = [
-        StructuredTool.from_function(get_customer_history),
-        StructuredTool.from_function(get_customer_profile),
-        StructuredTool.from_function(explain_risk_reasons),
-        StructuredTool.from_function(query_analytics),
+        StructuredTool.from_function(_timed(get_customer_history)),
+        StructuredTool.from_function(_timed(get_customer_profile)),
+        StructuredTool.from_function(_timed(explain_risk_reasons)),
+        StructuredTool.from_function(_timed(query_analytics)),
     ]
 
     if kafka_ops is not None:
@@ -75,6 +95,6 @@ def build_tools(store, analytics, kafka_ops=None, cfg: Settings = default_settin
             """Nombre de messages et offsets de fin d'un topic Kafka."""
             return _dump(kafka_ops.topic_offsets(topic))
 
-        tools += [StructuredTool.from_function(list_topics), StructuredTool.from_function(get_consumer_lag),
-                  StructuredTool.from_function(get_topic_offsets)]
+        tools += [StructuredTool.from_function(_timed(list_topics)), StructuredTool.from_function(_timed(get_consumer_lag)),
+                  StructuredTool.from_function(_timed(get_topic_offsets))]
     return tools

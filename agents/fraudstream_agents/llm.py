@@ -11,10 +11,12 @@ def build_llm(cfg: Settings = default_settings) -> BaseChatModel:
         from langchain_google_vertexai import ChatVertexAI  # dépendance optionnelle [vertex]
 
         return ChatVertexAI(model_name=cfg.gemini_model, project=cfg.gcp_project_id,
-                            location=cfg.gcp_location, temperature=cfg.llm_temperature)
+                            location=cfg.gcp_location, temperature=cfg.llm_temperature,
+                            max_retries=cfg.llm_max_retries)
     if not cfg.google_api_key:
         raise RuntimeError("GOOGLE_API_KEY manquant (ou USE_VERTEX=true avec un compte de service).")
     from langchain_google_genai import ChatGoogleGenerativeAI
 
     return ChatGoogleGenerativeAI(model=cfg.gemini_model, google_api_key=cfg.google_api_key,
-                                  temperature=cfg.llm_temperature)
+                                  temperature=cfg.llm_temperature, max_retries=cfg.llm_max_retries,
+                                  timeout=cfg.llm_timeout_s)

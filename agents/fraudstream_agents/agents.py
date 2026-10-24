@@ -11,10 +11,12 @@ Agents LangGraph.
 from __future__ import annotations
 
 import json
+import logging
 import re
 import time
 from typing import Any, Literal
 
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.prebuilt import create_react_agent
@@ -82,6 +84,37 @@ le résultat en français, chiffres à l'appui. Si la question est ambiguë, cho
 dis laquelle tu as retenue. Termine toujours par la requête SQL utilisée entre balises ```sql```."""
 
 
+# ----------------------------------------------------------------------------- observabilité
+
+log = logging.getLogger(__name__)
+
+
+class LlmTimingCallback(BaseCallbackHandler):
+    """Journalise la durée de chaque appel LLM et la taille du prompt : permet de séparer latence modèle / latence outils."""
+
+    def __init__(self):
+        self._t0: dict[Any, float] = {}
+        self.calls = 0
+        self.total_ms = 0
+
+    def on_chat_model_start(self, serialized, messages, *, run_id, **kwargs):
+        self._t0[run_id] = time.perf_counter()
+        n_chars = sum(len(str(m.content)) for batch in messages for m in batch)
+        log.info("LLM appel #%d démarré (%d caractères de contexte)", self.calls + 1, n_chars)
+
+    def on_llm_end(self, response, *, run_id, **kwargs):
+        t0 = self._t0.pop(run_id, None)
+        if t0 is not None:
+            ms = int((time.perf_counter() - t0) * 1000)
+            self.calls += 1
+            self.total_ms += ms
+            log.info("LLM appel #%d terminé en %d ms", self.calls, ms)
+
+    def on_llm_error(self, error, *, run_id, **kwargs):
+        self._t0.pop(run_id, None)
+        log.warning("LLM erreur : %s", str(error)[:300])
+
+
 # ----------------------------------------------------------------------------- utilitaires
 
 _JSON_RE = re.compile(r"```json\s*(\{.*?\})\s*```|(\{.*\})", re.S)
@@ -125,10 +158,12 @@ class FraudAnalystAgent:
     def investigate(self, alert: dict[str, Any]) -> InvestigationReport:
         t0 = time.perf_counter()
         alert_clean = {k: v for k, v in alert.items() if k != "isFraudLabel"}
+        timing = LlmTimingCallback()
         result = self.graph.invoke(
             {"messages": [HumanMessage(content="ALERTE À ANALYSER :\n" + json.dumps(alert_clean, ensure_ascii=False, default=str))]},
-            config={"recursion_limit": 2 * self.cfg.max_tool_calls + 4},
+            config={"recursion_limit": 2 * self.cfg.max_tool_calls + 4, "callbacks": [timing]},
         )
+        log.info("enquête %s : %d appels LLM, %d ms cumulés côté modèle", alert.get("alertId"), timing.calls, timing.total_ms)
         messages = result["messages"]
         final = _text(messages[-1])
         try:

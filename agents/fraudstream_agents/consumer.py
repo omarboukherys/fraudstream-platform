@@ -42,23 +42,43 @@ class AlertConsumer(threading.Thread):
             enable_auto_commit=False,
             auto_offset_reset="latest",
             value_deserializer=lambda b: json.loads(b.decode("utf-8")),
-            consumer_timeout_ms=1000,
-            max_poll_records=5,
+            max_poll_records=1,                    # une alerte à la fois : une enquête LLM dure plusieurs minutes
+            max_poll_interval_ms=30 * 60 * 1000,   # ceinture : tolère 30 min entre deux poll()
+            session_timeout_ms=45_000,
         )
         producer = KafkaProducer(bootstrap_servers=self.cfg.kafka_bootstrap_servers,
                                  value_serializer=lambda d: json.dumps(d, ensure_ascii=False, default=str).encode())
         log.info("alert consumer started on %s", self.cfg.alert_topic)
         try:
             while not self._stop.is_set():
-                for record in consumer:
-                    self._handle(record.value, producer)
-                    consumer.commit()
-                    if self._stop.is_set():
-                        break
+                batch = consumer.poll(timeout_ms=1000)
+                for _tp, records in batch.items():
+                    for record in records:
+                        self._process_keeping_alive(consumer, record.value, producer)
+                        if self._stop.is_set():
+                            return
         finally:
             consumer.close()
             producer.flush()
             producer.close()
+
+    def _process_keeping_alive(self, consumer: KafkaConsumer, alert: dict, producer: KafkaProducer):
+        """
+        Lance l'enquête dans un thread de travail et continue d'appeler poll() pendant ce temps, partitions en pause :
+        sans cela le consommateur dépasse max.poll.interval.ms, est exclu du groupe et le commit échoue
+        (bug observé : enquête de 11 min > 5 min par défaut). Pattern classique "pause / poll / resume".
+        """
+        assigned = consumer.assignment()
+        consumer.pause(*assigned)
+        worker = threading.Thread(target=self._handle, args=(alert, producer), name="investigation", daemon=True)
+        worker.start()
+        while worker.is_alive():
+            consumer.poll(timeout_ms=1000)      # ne renvoie rien (partitions en pause) mais maintient l'adhésion au groupe
+        consumer.resume(*consumer.assignment())
+        try:
+            consumer.commit()
+        except Exception:  # CommitFailedError après un rebalance : l'alerte sera rejouée, dédoublonnée sur alertId
+            log.exception("commit impossible pour %s (rebalance ?) : rejouée au prochain poll", alert.get("alertId"))
 
     def _handle(self, alert: dict, producer: KafkaProducer):
         alert_id = alert.get("alertId")
@@ -68,6 +88,8 @@ class AlertConsumer(threading.Thread):
         if self.store.get_investigation(alert_id):
             log.info("alerte %s déjà enquêtée, ignorée", alert_id)
             return
+        log.info("enquête démarrée pour %s (client %s, score %s, raisons %s)", alert_id, alert.get("customerId"),
+                 alert.get("riskScore"), alert.get("riskReasons"))
         try:
             report = self.agent.investigate(alert)
             self.store.save_investigation(report.model_dump())

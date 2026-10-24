@@ -105,7 +105,7 @@ services:
     environment:
       <<: *common-env
       PRODUCER_RATE_PER_SECOND: ${PRODUCER_RATE_PER_SECOND:-20}
-      PRODUCER_FRAUD_RATIO: ${PRODUCER_FRAUD_RATIO:-0.03}
+      PRODUCER_FRAUD_RATIO: ${PRODUCER_FRAUD_RATIO:-0.005}
       PRODUCER_CUSTOMERS: ${PRODUCER_CUSTOMERS:-500}
     depends_on:
       kafka-init:

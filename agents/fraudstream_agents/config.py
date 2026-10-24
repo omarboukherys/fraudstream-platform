@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     gcp_project_id: str = ""
     gcp_location: str = "europe-west1"
     llm_temperature: float = 0.1
+    llm_max_retries: int = 2            # le SDK Google réessaie avec backoff exponentiel : on borne
+    llm_timeout_s: int = 120
 
     # Données
     kafka_bootstrap_servers: str = "localhost:9094"
@@ -29,8 +31,9 @@ class Settings(BaseSettings):
     bq_max_bytes_billed: int = 1_000_000_000   # 1 Go max par requête : garde-fou coût
 
     # Agent
-    max_tool_calls: int = 8
-    sql_row_limit: int = 200
+    max_tool_calls: int = 6
+    sql_row_limit: int = 50             # lignes max renvoyées au LLM par requête SQL (taille du contexte = latence)
+    history_limit: int = 20
 
 
 settings = Settings()
