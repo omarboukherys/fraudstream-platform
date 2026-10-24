@@ -59,7 +59,7 @@ make ps                         # attendre que tout soit healthy / running
 make demo                       # injecte 4 fraudes, affiche alertes + enquêtes de l'agent
 ```
 
-Interfaces : Kafka UI `:8080` · Spark UI `:4040` · Airflow `:8081` (admin/admin) · Agents API `:8000/docs` · Producteur `:8090/actuator`.
+Interfaces (ports modifiables dans `.env`) : Kafka UI `:18085` · Spark UI `:14040` · Airflow `:18081` (admin/admin) · Agents API `:18800/docs` · Producteur `:18090/actuator`.
 
 Déclencher le batch quotidien : `make airflow-run` (ou depuis l'UI Airflow).
 

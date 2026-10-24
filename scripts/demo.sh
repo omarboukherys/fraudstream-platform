@@ -4,8 +4,8 @@
 # 2. attend que Spark les score et publie les alertes
 # 3. affiche les alertes du jour (Cassandra) et les rapports d'enquête de l'agent IA
 set -euo pipefail
-PRODUCER=${PRODUCER_URL:-http://localhost:8090}
-AGENTS=${AGENTS_URL:-http://localhost:8000}
+PRODUCER=${PRODUCER_URL:-http://localhost:18090}
+AGENTS=${AGENTS_URL:-http://localhost:18800}
 
 say() { printf "\n\033[1;34m▶ %s\033[0m\n" "$*"; }
 
@@ -34,4 +34,4 @@ say "Diagnostic d'exploitation du pipeline"
 curl -s -X POST "$AGENTS/ops" -H 'Content-Type: application/json' \
   -d '{"question": "Le pipeline est-il en bonne santé ? Y a-t-il du lag sur fraud.alerts ?"}' | python3 -m json.tool
 
-say "Terminé. UIs : Kafka http://localhost:8080 · Spark http://localhost:4040 · Airflow http://localhost:8081 (admin/admin) · Agents http://localhost:8000/docs"
+say "Terminé. UIs : Kafka http://localhost:18085 · Spark http://localhost:14040 · Airflow http://localhost:18081 (admin/admin) · Agents http://localhost:18800/docs"

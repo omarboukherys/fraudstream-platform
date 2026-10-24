@@ -29,7 +29,7 @@ demo: ## Scénario de démo : injecte 4 fraudes et affiche les enquêtes de l'ag
 	./scripts/demo.sh
 
 inject: ## Injecte un scénario : make inject S=IMPOSSIBLE_TRAVEL
-	curl -s -X POST "http://localhost:8090/api/producer/inject/$(S)" && echo
+	curl -s -X POST "http://localhost:$${PRODUCER_PORT:-18090}/api/producer/inject/$(S)" && echo
 
 airflow-run: ## Déclenche le DAG batch pour aujourd'hui
 	docker compose exec airflow airflow dags trigger fraudstream_daily -e $$(date -u +%F)

@@ -1,7 +1,7 @@
 
 # FraudStream Platform – stack locale complète (zéro coût)
 # Lancer : docker compose up -d --build
-# UIs    : Kafka UI http://localhost:8080 | Airflow http://localhost:8081 | Agents API http://localhost:8000/docs | Spark UI http://localhost:4040
+# UIs    : Kafka UI :18085 | Airflow :18081 | Agents API :18800/docs | Spark UI :14040 | Producteur :18090  (ports modifiables dans .env)
 
 name: fraudstream
 
@@ -60,7 +60,7 @@ services:
     image: provectuslabs/kafka-ui:latest
     container_name: fs-kafka-ui
     ports:
-      - "8080:8080"
+      - "${KAFKA_UI_PORT:-18085}:8080"
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
@@ -101,7 +101,7 @@ services:
     build: ./producer-springboot
     container_name: fs-producer
     ports:
-      - "8090:8090"
+      - "${PRODUCER_PORT:-18090}:8090"
     environment:
       <<: *common-env
       PRODUCER_RATE_PER_SECOND: ${PRODUCER_RATE_PER_SECOND:-20}
@@ -116,7 +116,7 @@ services:
     build: ./streaming-spark
     container_name: fs-spark-streaming
     ports:
-      - "4040:4040"
+      - "${SPARK_UI_PORT:-14040}:4040"
     environment:
       <<: *common-env
       CHECKPOINT_PATH: /data/checkpoints
@@ -148,7 +148,7 @@ services:
     build: ./batch-airflow
     container_name: fs-airflow
     ports:
-      - "8081:8080"
+      - "${AIRFLOW_PORT:-18081}:8080"
     environment:
       <<: *common-env
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -176,7 +176,7 @@ services:
     build: ./agents
     container_name: fs-agents
     ports:
-      - "8000:8000"
+      - "${AGENTS_PORT:-18800}:8000"
     environment:
       <<: *common-env
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
