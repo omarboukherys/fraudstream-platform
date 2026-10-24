@@ -180,7 +180,7 @@ services:
     environment:
       <<: *common-env
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.8-flash}
       USE_BIGQUERY: ${USE_BIGQUERY:-false}
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
       BQ_DATASET: ${BQ_DATASET:-fraudstream}
