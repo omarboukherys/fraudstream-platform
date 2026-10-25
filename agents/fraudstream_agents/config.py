@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     # LLM
-    gemini_model: str = "gemini-3.1-flash-lite"
+    gemini_model: str = "gemini-3.5-flash-lite"
     google_api_key: str = ""            # clé AI Studio (palier gratuit) ...
     use_vertex: bool = False            # ... ou Vertex AI avec le compte de service GCP
     gcp_project_id: str = ""
