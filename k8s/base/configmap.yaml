@@ -9,6 +9,6 @@ data:
   CASSANDRA_KEYSPACE: fraudstream
   LAKE_PATH: /data/lake            # overlay gke : gs://<bucket>/lake
   CHECKPOINT_PATH: /data/checkpoints
-  GEMINI_MODEL: gemini-3.8-flash
+  GEMINI_MODEL: gemini-3.1-flash-lite
   USE_BIGQUERY: "false"
   ALERT_CONSUMER_ENABLED: "true"
