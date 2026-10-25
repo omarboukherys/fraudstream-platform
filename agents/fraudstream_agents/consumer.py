@@ -10,8 +10,10 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
-from datetime import date, datetime
+import time
+from datetime import date, datetime, timezone
 
 from kafka import KafkaConsumer, KafkaProducer
 
@@ -29,7 +31,12 @@ class AlertConsumer(threading.Thread):
         self._stop = threading.Event()
         self.processed = 0
         self.failed = 0
+        self.skipped_budget = 0
         self.last_report: dict | None = None
+        # Garde-fous quota LLM (palier gratuit Gemini : N requêtes/jour/modèle)
+        self._budget_day: date = datetime.now(timezone.utc).date()
+        self.investigations_today = 0
+        self.paused_until: float = 0.0          # epoch ; > now => on ne consomme pas (429 reçu)
 
     def stop(self):
         self._stop.set()
@@ -50,7 +57,19 @@ class AlertConsumer(threading.Thread):
                                  value_serializer=lambda d: json.dumps(d, ensure_ascii=False, default=str).encode())
         log.info("alert consumer started on %s", self.cfg.alert_topic)
         try:
+            assigned_paused = False
             while not self._stop.is_set():
+                # Pause quota : on garde l'adhésion au groupe (poll) mais sans consommer (partitions en pause)
+                if time.time() < self.paused_until or self._budget_exhausted():
+                    if not assigned_paused and consumer.assignment():
+                        consumer.pause(*consumer.assignment())
+                        assigned_paused = True
+                    consumer.poll(timeout_ms=1000)
+                    continue
+                if assigned_paused:
+                    consumer.resume(*consumer.assignment())
+                    assigned_paused = False
+                    log.info("reprise de la consommation des alertes")
                 batch = consumer.poll(timeout_ms=1000)
                 for _tp, records in batch.items():
                     for record in records:
@@ -80,6 +99,31 @@ class AlertConsumer(threading.Thread):
         except Exception:  # CommitFailedError après un rebalance : l'alerte sera rejouée, dédoublonnée sur alertId
             log.exception("commit impossible pour %s (rebalance ?) : rejouée au prochain poll", alert.get("alertId"))
 
+    def _budget_exhausted(self) -> bool:
+        today = datetime.now(timezone.utc).date()
+        if today != self._budget_day:                 # nouveau jour : compteur remis à zéro
+            self._budget_day, self.investigations_today = today, 0
+        if self.investigations_today >= self.cfg.max_investigations_per_day:
+            if self.investigations_today == self.cfg.max_investigations_per_day:
+                log.warning("budget quotidien atteint (%d enquêtes) : alertes laissées dans Kafka jusqu'à demain",
+                            self.cfg.max_investigations_per_day)
+                self.investigations_today += 1        # pour ne journaliser qu'une fois
+            return True
+        return False
+
+    @staticmethod
+    def _retry_delay_from_error(exc: Exception, default_s: int) -> int:
+        """Extrait 'retryDelay': '63377s' ou 'Please retry in 17h36m17s' d'une erreur 429 Google."""
+        msg = str(exc)
+        m = re.search(r"retryDelay['\"]?:\s*['\"]?(\d+)s", msg)
+        if m:
+            return int(m.group(1))
+        m = re.search(r"retry in (?:(\d+)h)?(?:(\d+)m)?(?:([\d.]+)s)?", msg)
+        if m and any(m.groups()):
+            h, mi, se = (int(m.group(1) or 0), int(m.group(2) or 0), float(m.group(3) or 0))
+            return int(h * 3600 + mi * 60 + se) or default_s
+        return default_s
+
     def _handle(self, alert: dict, producer: KafkaProducer):
         alert_id = alert.get("alertId")
         if not alert_id:
@@ -91,6 +135,7 @@ class AlertConsumer(threading.Thread):
         log.info("enquête démarrée pour %s (client %s, score %s, raisons %s)", alert_id, alert.get("customerId"),
                  alert.get("riskScore"), alert.get("riskReasons"))
         try:
+            self.investigations_today += 1
             report = self.agent.investigate(alert)
             self.store.save_investigation(report.model_dump())
             event_time = datetime.fromisoformat(str(alert["eventTime"]).replace("Z", "+00:00"))
@@ -102,8 +147,12 @@ class AlertConsumer(threading.Thread):
             self.last_report = report.model_dump(exclude={"evidence"})
             log.info("alerte %s -> %s (%.2f) en %d ms, %d outils", alert_id, report.verdict, report.confidence,
                      report.latency_ms, report.tool_calls)
-        except Exception:  # on log et on continue : une alerte en échec ne doit pas bloquer le flux
+        except Exception as exc:  # on log et on continue : une alerte en échec ne doit pas bloquer le flux
             self.failed += 1
+            if "429" in str(exc) or "RESOURCE_EXHAUSTED" in str(exc) or "RateLimit" in type(exc).__name__:
+                delay = min(self._retry_delay_from_error(exc, self.cfg.rate_limit_pause_s), 24 * 3600)
+                self.paused_until = time.time() + delay
+                log.warning("quota LLM dépassé (429) : consommation des alertes en pause %d s", delay)
             log.exception("échec de l'enquête pour %s", alert_id)
 
 

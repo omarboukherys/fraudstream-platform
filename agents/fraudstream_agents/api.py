@@ -13,6 +13,7 @@ Lancer : uvicorn fraudstream_agents.api:app --host 0.0.0.0 --port 8000
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
 from typing import Any
@@ -74,7 +75,11 @@ def health():
 def metrics():
     c: AlertConsumer | None = state.get("consumer")
     return {"started_at": state.get("started_at"), "alerts_processed": c.processed if c else 0,
-            "alerts_failed": c.failed if c else 0, "last_report": c.last_report if c else None}
+            "alerts_failed": c.failed if c else 0,
+            "investigations_today": c.investigations_today if c else 0,
+            "daily_budget": settings.max_investigations_per_day,
+            "paused_until": datetime.fromtimestamp(c.paused_until, tz=timezone.utc).isoformat() if c and c.paused_until > time.time() else None,
+            "last_report": c.last_report if c else None}
 
 
 @app.post("/investigate", response_model=InvestigationReport)

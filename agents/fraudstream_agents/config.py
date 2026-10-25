@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     bq_max_bytes_billed: int = 1_000_000_000   # 1 Go max par requête : garde-fou coût
 
     # Agent
+    max_investigations_per_day: int = 150   # ~2-3 appels LLM par enquête : reste sous 500 req/jour (palier gratuit)
+    rate_limit_pause_s: int = 900           # pause par défaut sur 429 si l'API ne donne pas de délai
     max_tool_calls: int = 6
     sql_row_limit: int = 50             # lignes max renvoyées au LLM par requête SQL (taille du contexte = latence)
     history_limit: int = 20

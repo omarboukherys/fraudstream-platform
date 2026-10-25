@@ -71,3 +71,10 @@ donc toute transaction normale datée `now` était « en retard » et **jetée a
 **Correctif** : les scénarios se déroulent dans le passé immédiat et se terminent à `now` (test `noScenarioEverDatesAnEventInTheFuture`),
 watermark élargi à 5 min. **Leçon** : en event-time, surveiller `eventTime.watermark` dans `query.lastProgress` et le nombre de
 lignes jetées (`numRowsDroppedByWatermark`) dès qu'un flux "maigrit" sans raison.
+
+### 10. `429 RESOURCE_EXHAUSTED … limit: 500 … per day … Free Tier`
+Le quota gratuit Gemini est de **500 requêtes/jour/modèle** ; un rattrapage de backlog (≈ 2-3 appels par enquête) le vide en une heure.
+**Correctif** (`consumer.py`) : budget quotidien d'enquêtes (`MAX_INVESTIGATIONS_PER_DAY=150`) au-delà duquel les alertes restent
+dans Kafka (partitions en pause, adhésion au groupe conservée) ; sur 429, pause automatique de la durée indiquée par l'API
+(`retryDelay`) ; `/metrics` expose `investigations_today`, `daily_budget`, `paused_until`. Le quota étant par modèle, changer
+`GEMINI_MODEL` permet de continuer la démo le jour même.
