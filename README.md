@@ -47,6 +47,7 @@ La v1 répondait à « comment scorer une transaction en temps réel avec un mod
 | Kubernetes : kustomize, StatefulSets, Workload Identity | [`k8s/`](k8s) |
 | Agents IA : ReAct, outils, NL→SQL avec garde-fous, auditabilité | [`agents/fraudstream_agents/agents.py`](agents/fraudstream_agents/agents.py) |
 | Portabilité Azure (Event Hubs, Databricks, ADLS, AKS) | [`docs/azure-portability.md`](docs/azure-portability.md) |
+| Exploitation : incidents réels, diagnostic, correctifs | [`docs/runbook.md`](docs/runbook.md) |
 
 ## Démarrage rapide (local, 0 €)
 
@@ -140,7 +141,7 @@ agents/                Python 3.11 · FastAPI · LangGraph · Gemini · DuckDB/B
 cassandra/             schéma CQL
 k8s/                   kustomize : base + overlays kind / gke
 gcp/                   scripts gcloud/bq, schéma BigQuery, GKE
-docs/                  architecture, portabilité Azure, notes d'entretien
+docs/                  architecture, runbook de dépannage, portabilité Azure, notes d'entretien
 ```
 
 ## Licence

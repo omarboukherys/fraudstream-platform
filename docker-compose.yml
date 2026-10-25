@@ -32,8 +32,16 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_NUM_PARTITIONS: 3
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
-      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_LOG_RETENTION_HOURS: 48          # démo : borne le disque
+      KAFKA_HEAP_OPTS: "-Xmx1536m -Xms1024m"
       CLUSTER_ID: fraudstream-local-cluster-0001
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits: {memory: 2g}
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
       interval: 10s
@@ -59,6 +67,7 @@ services:
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
     container_name: fs-kafka-ui
+    restart: unless-stopped
     ports:
       - "${KAFKA_UI_PORT:-18085}:8080"
     environment:
@@ -72,12 +81,16 @@ services:
   cassandra:
     image: cassandra:5.0
     container_name: fs-cassandra
+    restart: unless-stopped
     ports:
       - "9042:9042"
     environment:
       CASSANDRA_CLUSTER_NAME: fraudstream
       HEAP_NEWSIZE: 128M
       MAX_HEAP_SIZE: 1G
+    deploy:
+      resources:
+        limits: {memory: 2500m}
     volumes:
       - cassandra-data:/var/lib/cassandra
     healthcheck:
@@ -100,6 +113,7 @@ services:
   producer:
     build: ./producer-springboot
     container_name: fs-producer
+    restart: unless-stopped
     ports:
       - "${PRODUCER_PORT:-18090}:8090"
     environment:
@@ -115,12 +129,16 @@ services:
   spark-streaming:
     build: ./streaming-spark
     container_name: fs-spark-streaming
+    restart: unless-stopped
     ports:
       - "${SPARK_UI_PORT:-14040}:4040"
     environment:
       <<: *common-env
       CHECKPOINT_PATH: /data/checkpoints
-      SPARK_DRIVER_MEMORY: 1g
+      SPARK_DRIVER_MEMORY: ${SPARK_DRIVER_MEMORY:-2g}
+    deploy:
+      resources:
+        limits: {memory: 3g}
     volumes:
       - lake-data:/data
     depends_on:
@@ -133,6 +151,7 @@ services:
   airflow-db:
     image: postgres:16-alpine
     container_name: fs-airflow-db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow
@@ -147,6 +166,7 @@ services:
   airflow:
     build: ./batch-airflow
     container_name: fs-airflow
+    restart: unless-stopped
     ports:
       - "${AIRFLOW_PORT:-18081}:8080"
     environment:
@@ -175,6 +195,7 @@ services:
   agents:
     build: ./agents
     container_name: fs-agents
+    restart: unless-stopped
     ports:
       - "${AGENTS_PORT:-18800}:8000"
     environment:
@@ -196,6 +217,7 @@ services:
         condition: service_completed_successfully
 
 volumes:
+  kafka-data:
   cassandra-data:
   lake-data:
   airflow-db:
