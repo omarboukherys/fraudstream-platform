@@ -64,3 +64,12 @@ def test_malformed_llm_output_falls_back_to_safe_verdict(cfg, store, lake, alert
 def test_extract_json_handles_fences_and_raw():
     assert extract_json('```json\n{"a": 1}\n```')["a"] == 1
     assert extract_json('blabla {"b": [1,2]} fin')["b"] == [1, 2]
+
+
+def test_history_tool_never_exposes_ground_truth_label(cfg, lake):
+    from fraudstream_agents.store import InMemoryStore
+
+    leaky = InMemoryStore(history={"C1": [{"transaction_id": "t1", "amount": 10.0, "is_fraud_label": True}]})
+    tools = {t.name: t for t in build_tools(leaky, DuckDbAnalytics(lake), None, cfg)}
+    out = tools["get_customer_history"].invoke({"customer_id": "C1"})
+    assert "is_fraud_label" not in out and '"t1"' in out

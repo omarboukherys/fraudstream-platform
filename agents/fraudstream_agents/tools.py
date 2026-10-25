@@ -47,7 +47,9 @@ def _timed(fn):
 def build_tools(store, analytics, kafka_ops=None, cfg: Settings = default_settings) -> list[StructuredTool]:
     def get_customer_history(customer_id: str, limit: int = 20) -> str:
         """Dernières transactions du client (les plus récentes d'abord) avec score et raisons de risque."""
-        return _dump(store.customer_history(customer_id, min(limit, cfg.history_limit)))
+        rows = store.customer_history(customer_id, min(limit, cfg.history_limit))
+        # La vérité terrain synthétique ne doit jamais atteindre le LLM (sinon l'évaluation de l'agent est biaisée)
+        return _dump([{k: v for k, v in r.items() if k != "is_fraud_label"} for r in rows])
 
     def get_customer_profile(customer_id: str) -> str:
         """Profil courant du client : agrégats sur 10 min, dernier pays et dernier appareil vus."""
