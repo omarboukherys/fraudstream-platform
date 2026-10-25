@@ -47,6 +47,21 @@ class TransactionGeneratorTest {
     }
 
     @Test
+    void noScenarioEverDatesAnEventInTheFuture() {
+        CustomerProfile c = gen.customers().get(3);
+        Instant before = Instant.now();
+        List<Transaction> all = new java.util.ArrayList<>();
+        all.addAll(gen.cardTesting(c));
+        all.addAll(gen.impossibleTravel(c));
+        all.addAll(gen.highAmount(c));
+        all.addAll(gen.accountTakeover(c));
+        Instant after = Instant.now().plusMillis(50);
+        all.forEach(tx -> assertFalse(tx.eventTime().isAfter(after), "eventTime dans le futur : " + tx.eventTime()));
+        // et le scénario se termine bien "maintenant" (pas dans un passé lointain)
+        assertTrue(gen.impossibleTravel(c).get(1).eventTime().isAfter(before.minusSeconds(5)));
+    }
+
+    @Test
     void fraudRatioZeroNeverEmitsFraud() {
         for (int i = 0; i < 500; i++) {
             gen.next().forEach(tx -> assertFalse(tx.isFraudLabel()));

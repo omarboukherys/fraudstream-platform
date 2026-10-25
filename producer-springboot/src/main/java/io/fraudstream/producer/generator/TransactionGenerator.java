@@ -88,27 +88,31 @@ public class TransactionGenerator {
     }
 
     // ---------------------------------------------------------------- scénarios de fraude
+    //
+    // RÈGLE : un scénario multi-événements se déroule dans le PASSÉ immédiat et se termine à `now`.
+    // Un eventTime dans le futur fait avancer le watermark Spark au-delà de l'horloge, et toutes les
+    // transactions normales (datées `now`) sont alors jetées comme "en retard". Bug réellement rencontré.
 
     public List<Transaction> cardTesting(CustomerProfile c) {
         List<Transaction> out = new ArrayList<>();
-        Instant t0 = Instant.now();
         String newDevice = "dev-" + randomHex(8);
         int burst = 6 + ThreadLocalRandom.current().nextInt(6);
+        Instant start = Instant.now().minusSeconds(3L * (burst - 1));
         for (int i = 0; i < burst; i++) {
             BigDecimal amount = BigDecimal.valueOf(1 + ThreadLocalRandom.current().nextInt(9)); // 1..9 MAD
-            out.add(build(c, t0.plusSeconds(i * 3L), amount, "ELECTRONICS", Channel.ONLINE,
+            out.add(build(c, start.plusSeconds(i * 3L), amount, "ELECTRONICS", Channel.ONLINE,
                     c.homeCountry(), c.homeCity(), newDevice, true, "CARD_TESTING"));
         }
         return out;
     }
 
     public List<Transaction> impossibleTravel(CustomerProfile c) {
-        Instant t0 = Instant.now();
+        Instant now = Instant.now();
         String abroad = FOREIGN_COUNTRIES[ThreadLocalRandom.current().nextInt(FOREIGN_COUNTRIES.length)];
         return List.of(
-                build(c, t0, lognormalAround(c.typicalAmount(), 0.4), "RESTAURANT", Channel.CARD_PRESENT,
+                build(c, now.minusSeconds(240), lognormalAround(c.typicalAmount(), 0.4), "RESTAURANT", Channel.CARD_PRESENT,
                         c.homeCountry(), c.homeCity(), c.usualDeviceId(), true, "IMPOSSIBLE_TRAVEL"),
-                build(c, t0.plusSeconds(240), lognormalAround(c.typicalAmount().multiply(BigDecimal.valueOf(3)), 0.4),
+                build(c, now, lognormalAround(c.typicalAmount().multiply(BigDecimal.valueOf(3)), 0.4),
                         "ELECTRONICS", Channel.CARD_PRESENT, abroad, "Unknown", c.usualDeviceId(), true, "IMPOSSIBLE_TRAVEL"));
     }
 

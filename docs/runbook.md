@@ -62,3 +62,12 @@ curl -s -w "\nHTTP %{http_code} en %{time_total}s" -X POST \
   "https://generativelanguage.googleapis.com/v1beta/models/$MODEL:generateContent?key=$KEY" \
   -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"Reponds: OK"}]}]}'
 ```
+
+### 9. Spark ne garde que 0-4 transactions par batch alors que Kafka en reçoit ~115 (le plus sournois)
+Seules les transactions des scénarios de fraude passaient. Cause : le générateur datait certains événements **dans le futur**
+(`IMPOSSIBLE_TRAVEL` : 2ᵉ transaction à `now + 4 min`). Le watermark Spark = max(eventTime) − 2 min = `now + 2 min`,
+donc toute transaction normale datée `now` était « en retard » et **jetée avant l'opérateur à état**. Les premiers batches
+(watermark pas encore avancé) étaient pleins, puis plus rien — et la détection paraissait parfaite (100 % de fraudes dans les alertes).
+**Correctif** : les scénarios se déroulent dans le passé immédiat et se terminent à `now` (test `noScenarioEverDatesAnEventInTheFuture`),
+watermark élargi à 5 min. **Leçon** : en event-time, surveiller `eventTime.watermark` dans `query.lastProgress` et le nombre de
+lignes jetées (`numRowsDroppedByWatermark`) dès qu'un flux "maigrit" sans raison.

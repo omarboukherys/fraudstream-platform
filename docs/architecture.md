@@ -68,7 +68,7 @@ Les paramètres ci-dessous sont ceux du code ; les mesures (débit max, latence)
 exécution** et à reporter dans le README (section « Résultats ») — ne pas annoncer de chiffres non mesurés en entretien.
 
 - Producteur : 20 lots/s par défaut (`PRODUCER_RATE_PER_SECOND`), 3 partitions ; monter le débit via `POST /api/producer/rate/{n}` et observer le lag dans Kafka UI.
-- Spark local[*] : micro-batch 5 s (`TRIGGER_SECONDS`), watermark 2 min, `maxOffsetsPerTrigger` 5 000. Latence bout-en-bout attendue ≈ trigger + durée du batch : à mesurer avec `eventTime` vs `created_at` de l'enquête.
+- Spark local[*] : micro-batch 5 s (`TRIGGER_SECONDS`), watermark 5 min, `maxOffsetsPerTrigger` 5 000. Latence bout-en-bout attendue ≈ trigger + durée du batch : à mesurer avec `eventTime` vs `created_at` de l'enquête.
 - Cassandra : TTL 30 j sur l'historique ; `customer_profile` = 1 ligne/client, upsert.
 - BigQuery : partition + cluster `customerId, isAlert` ; expiration 60 j ; `maximum_bytes_billed` 1 Go par requête d'agent.
 - Gemini Flash : `max_tool_calls` 8 ; latence par enquête et nombre moyen d'outils sont exposés dans `investigations.latency_ms` et `tool_calls`.

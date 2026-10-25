@@ -29,7 +29,7 @@ object Config {
     lakePath          = env("LAKE_PATH", "./data/lake"),          // ou gs://<bucket>/lake
     checkpointPath    = env("CHECKPOINT_PATH", "./data/checkpoints"),
     triggerSeconds    = env("TRIGGER_SECONDS", "5").toInt,
-    watermark         = env("WATERMARK", "2 minutes"),
+    watermark         = env("WATERMARK", "5 minutes"),   // événements plus vieux que (max eventTime - 5 min) = jetés
     bqDirectWrite     = env("BQ_DIRECT_WRITE", "false").toBoolean,
     bqProject         = env("GCP_PROJECT_ID", ""),
     bqDataset         = env("BQ_DATASET", "fraudstream"),
