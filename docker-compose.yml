@@ -184,7 +184,8 @@ services:
     volumes:
       - ./batch-airflow/dags:/opt/airflow/dags
       - ./batch-airflow/jobs:/opt/airflow/jobs
-      - lake-data:/data
+      - lake-data:/data                   # lecture du lac (écrit par Spark, uid 185)
+      - marts-data:/data/lake/marts       # écriture des agrégats (uid airflow 50000) : volume séparé => pas de conflit de permissions
       - ${GCP_SA_KEY_PATH:-./gcp/.empty}:/secrets/gcp-sa.json:ro
     command: standalone
     depends_on:
@@ -209,6 +210,7 @@ services:
       ALERT_CONSUMER_ENABLED: "true"
     volumes:
       - lake-data:/data
+      - marts-data:/data/lake/marts
       - ${GCP_SA_KEY_PATH:-./gcp/.empty}:/secrets/gcp-sa.json:ro
     depends_on:
       kafka-init:
@@ -220,4 +222,5 @@ volumes:
   kafka-data:
   cassandra-data:
   lake-data:
+  marts-data:
   airflow-db:

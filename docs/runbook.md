@@ -78,3 +78,19 @@ Le quota gratuit Gemini est de **500 requêtes/jour/modèle** ; un rattrapage de
 dans Kafka (partitions en pause, adhésion au groupe conservée) ; sur 429, pause automatique de la durée indiquée par l'API
 (`retryDelay`) ; `/metrics` expose `investigations_today`, `daily_budget`, `paused_until`. Le quota étant par modèle, changer
 `GEMINI_MODEL` permet de continuer la démo le jour même.
+
+### 11. Airflow : `Mkdirs failed to create file:/data/lake/marts/...` (exit code 1 sur `spark_daily_aggregates`)
+Volume `/data` partagé entre l'image Spark (fichiers créés par l'uid 185) et Airflow (uid 50000) : Airflow ne peut pas
+écrire les marts. **Déblocage** : `docker compose exec -u root airflow chmod -R a+rwX /data/lake` puis
+`airflow tasks clear fraudstream_daily -y --start-date <ds> --end-date <ds>`. **Correctif** : volume `marts-data`
+dédié aux agrégats (monté dans Airflow et les agents) ; Spark n'y touche jamais. Règle : un volume partagé entre
+images = un seul écrivain par répertoire.
+
+### 12. Prolifération de petits fichiers Parquet (9 150 fichiers pour une journée)
+6 fichiers par micro-batch de 5 s (un par partition de shuffle). **Correctif** : `coalesce(1)` avant l'écriture du lac
+(1 fichier/batch) ; en production, trigger de 30-60 s et compaction de la partition J-1 dans le DAG. À surveiller avec
+`find /data/lake/transactions_scored -name "*.parquet" | wc -l` par jour.
+
+### 13. `fs-spark-streaming` absent de `docker compose ps` au matin, sans erreur dans ses logs
+Tué par la mise en veille / le redémarrage de Docker Desktop ; sans `restart: unless-stopped` il ne revient pas.
+**Correctif** : politique de redémarrage sur tous les services (commit robustesse). Reprise depuis le checkpoint, sans perte.

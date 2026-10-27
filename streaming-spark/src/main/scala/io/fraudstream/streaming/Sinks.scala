@@ -48,7 +48,10 @@ object Sinks {
         .mode(SaveMode.Append).save()
 
       // 3. Lac Parquet partitionné par jour (local ou GCS). Source de vérité pour le batch Airflow -> BigQuery.
+      //    coalesce(1) : un micro-batch de 5 s est petit, 1 fichier par batch au lieu de 6 (small files problem).
+      //    En prod : trigger plus long (30-60 s) + compaction quotidienne de la partition J-1 (voir DAG).
       batch
+        .coalesce(1)
         .withColumn("event_date", to_date($"eventTime"))
         .withColumn("ingested_at", current_timestamp())
         .write.mode(SaveMode.Append)
